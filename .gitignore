@@ -1,0 +1,32 @@
+# ---- Gradle / build ----
+*.iml
+.gradle/
+/build/
+/app/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+.kotlin/
+
+# ---- Android Studio / IDE ----
+.idea/
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+bin/
+gen/
+out/
+
+# ---- Sistema operativo ----
+.DS_Store
+Thumbs.db
+
+# ---- Secretos / configuración privada ----
+# Contiene la configuración del proyecto de Firebase: no se publica.
+google-services.json
+*.jks
+*.keystore
+keystore.properties

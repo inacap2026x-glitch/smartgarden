@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() { return request.auth != null; }
+    function esAnonimo() { return request.auth.token.firebase.sign_in_provider == 'anonymous'; }
+    function esAdmin() {
+      return autenticado() && !esAnonimo()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin';
+    }
+    // El dispositivo simulado solo puede cambiar telemetría, actuadores y estado de alerta
+    function soloTelemetria() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['temperatura', 'humedad', 'bombaEncendida', 'ventiladorEncendido',
+                  'ultimaActualizacion', 'alertaEstado', 'alertaInicio', 'ventiladorEmergencia']);
+    }
+
+    match /usuarios/{userId} {
+      allow read: if autenticado() && (request.auth.uid == userId || esAdmin());
+      allow create: if autenticado() && request.auth.uid == userId
+                    && request.resource.data.rol == 'usuario';
+      allow update: if esAdmin()
+                    || (autenticado() && request.auth.uid == userId
+                        && request.resource.data.rol == resource.data.rol
+                        && request.resource.data.get('activo', true) == resource.data.get('activo', true));
+      allow delete: if esAdmin();
+
+      match /plantas/{plantaId} {
+        allow read, write: if autenticado() && (request.auth.uid == userId || esAdmin());
+        allow read: if esAnonimo();
+        allow update: if esAnonimo() && soloTelemetria();
+      }
+    }
+
+    // Consulta de todas las plantas (admin y simulador)
+    match /{path=**}/plantas/{plantaId} {
+      allow read: if esAdmin() || esAnonimo();
+    }
+
+    match /sensores/{sensorId} {
+      allow read, create: if autenticado();
+      allow update: if autenticado() && !esAnonimo();
+      allow delete: if esAdmin();
+    }
+
+    match /registros/{registroId} {
+      allow read: if esAdmin();
+      allow create: if autenticado();
+    }
+
+    // Coordinación del simulador entre teléfonos
+    match /sistema/{docId} {
+      allow read, write: if esAnonimo();
+    }
+
+    // Control de intentos de login (se consulta antes de autenticar)
+    match /intentosLogin/{emailId} {
+      allow read, write: if true;
+    }
+  }
+}
